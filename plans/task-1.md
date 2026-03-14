@@ -1,39 +1,50 @@
-Call an LLM from Code
-Build a CLI that connects to an LLM and answers questions. This is the foundation for the agent you will build in the next tasks.
+# Task 1: Call an LLM from Code - Implementation Plan
 
-What you will build
-A Python CLI program (agent.py) that takes a question, sends it to an LLM, and returns a structured JSON answer. No tools or agentic loop yet — just the basic plumbing: parse input, call the LLM, format output. You will add tools and the agentic loop in Tasks 2–3.
+## LLM Provider and Model
 
-User question → agent.py → LLM API → JSON answer
-Input — a question as the first command-line argument:
+- **Provider**: Qwen Code API (OpenAI-compatible endpoint)
+- **Model**: `qwen3-coder-plus`
+- **API Base**: Configured via `LLM_API_BASE` environment variable
+- **API Key**: Stored in `.env.agent.secret` (not hardcoded)
 
-uv run agent.py "What does REST stand for?"
-Output — a single JSON line to stdout:
+## Agent Architecture
 
-{"answer": "Representational State Transfer.", "tool_calls": []}
-Rules:
+### Input/Output Flow
 
-answer and tool_calls fields are required in the output.
-tool_calls is an empty array for this task (you will populate it in Task 2).
-Only valid JSON goes to stdout. All debug/progress output goes to stderr.
-The agent must respond within 60 seconds.
-Exit code 0 on success.
-How to get access to an LLM?
-Your agent needs an LLM that supports the OpenAI-compatible chat completions API. You are free to use any provider.
+```
+Command line argument → agent.py → HTTP POST to LLM API → Parse response → JSON to stdout
+```
 
-Recommended: Set up the Qwen Code API on your VM
+### Components
 
-Qwen Code provides 1000 free requests per day, works from Russia, and requires no credit card.
+1. **Environment Loading**: Read `.env.agent.secret` to get `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL`
+2. **Argument Parsing**: Get the question from `sys.argv[1]`
+3. **API Call**: Send POST request to `{LLM_API_BASE}/chat/completions` with the question
+4. **Response Parsing**: Extract the assistant's message from the LLM response
+5. **JSON Output**: Print `{"answer": "...", "tool_calls": []}` to stdout
 
-Follow the setup instructions to deploy it on your VM.
+### Error Handling
 
-Model	Tool calling	Notes
-qwen3-coder-plus	Strong	Recommended, default in .env.agent.example
-coder-model	Strong	Qwen 3.5 Plus
-Alternative: OpenRouter (click to open)
-Create the agent environment file:
+- Missing arguments → print usage to stderr, exit code 1
+- Missing environment variables → print error to stderr, exit code 1
+- API request failure → print error to stderr, exit code 1
+- Timeout (60s) → handled by subprocess runner
 
-cp .env.agent.example .env.agent.secret
-Edit .env.agent.secret and fill in LLM_API_KEY, LLM_API_BASE, and LLM_MODEL. Your agent reads from this file.
+### Output Rules
 
-Note: This is not the same as LMS_API_KEY in .env.docker.secret. That one protects your backend LMS endpoints. LLM_API_KEY authenticates with your LLM provider.
+- **stdout**: Only valid JSON with `answer` and `tool_calls` fields
+- **stderr**: All debug/progress messages
+- **Exit code**: 0 on success, non-zero on error
+
+## Dependencies
+
+- Use `httpx` (already in `pyproject.toml`) for async HTTP requests
+- Use `os.environ` for environment variables
+- Use `json` for JSON parsing/output
+- Use `sys` for command-line arguments and stderr
+
+## Testing Strategy
+
+- Run `uv run agent.py "What is 2+2?"` and verify JSON output
+- Check that `answer` field contains a response
+- Check that `tool_calls` is an empty array
