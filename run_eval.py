@@ -115,6 +115,7 @@ def _run_agent(question: str, timeout: int = 60):
     if not stdout:
         return None, "Agent produced no output"
 
+
     try:
         data = json.loads(stdout)
     except json.JSONDecodeError:
@@ -223,6 +224,7 @@ def _check_question(q: dict, data: dict) -> tuple[bool, str]:
                 return False, f"    {YELLOW}hint: {feedback}{RESET}"
             else:
                 return False, f"    Source '{source}' doesn't match expected"
+
 
     # Check tool usage
     check_tools = q.get("check_tools")
